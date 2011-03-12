@@ -1,0 +1,12 @@
+span.xml-name {color: #00f;}
+span.xml-tag {color: #a0b;}
+span.xml-attribute {color: #281;}
+span.xml-attname {color: #00f;}
+span.xml-comment {color: #a70;}
+span.xml-cdata {color: #48a;}
+span.xml-processing {color: #999;}
+span.xml-entity {color: #a22;}
+span.xml-start-dtd {color: #666600;}
+span.xml-warning {color: #CC6600;}
+span.xml-error {color: #CC0000;}
+

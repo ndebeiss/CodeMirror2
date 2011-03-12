@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <title>CodeMirror 2: schema aware XML mode</title>
+    <link rel="stylesheet" href="../../lib/codemirror.css">
+    <script src="../../lib/codemirror.js"></script>
+    <script type="text/javascript" src="jssaxparser/validation_common/validator_functions.js"></script>
+    <script type="text/javascript" src="jssaxparser/validation_common/validator_objects.js"></script>
+    <script type="text/javascript" src="jssaxparser/validation_common/dom_utils.js"></script>
+    <script type="text/javascript" src="jssaxparser/jsdatatypelibrary-0.2/datatype_library.js"></script>
+    <script src="jssaxparser/sax.js"></script>
+    <script src="sa_xml.js"></script>
+    <link rel="stylesheet" href="sa_xml.css">
+  </head>
+  <body>
+    <h1>CodeMirror 2: schema aware XML mode</h1>
+    <form><div style="border-top: 1px solid black; border-bottom: 1px solid black;">
+        <textarea id="code" style="display: none" name="code">
+&lt;!DOCTYPE CATALOG SYSTEM "dtd/catalog.dtd"&gt;
+&lt;CATALOG&gt;
+    &lt;INVALID/&gt;
+&lt;/CATALOG&gt;
+</textarea></div></form>
+    <script>
+      var editor = CodeMirror.fromTextArea(document.getElementById("code"), {mode: {name: "sa_xml"}, workTime: 100000000});
+    </script>
+    <p></p>
+    <div id="error"></div>
+<p></p>
+</html>
