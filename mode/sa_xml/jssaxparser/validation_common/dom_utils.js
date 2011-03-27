@@ -48,8 +48,9 @@ DOCUMENT_FRAGMENT_NODE = 11;
 NOTATION_NODE = 12;
 
 function cloneArray(array) {
-	var clone = new Array();
-	for (var i in array) {
+	var clone = [];
+        var i = array.length;
+        while (i--) {
 		clone[i] = array[i];
 	}
 	return clone;

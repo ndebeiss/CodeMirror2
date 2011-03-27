@@ -145,8 +145,15 @@ var STATE_TRAILING_MISC             =  6;
     Handler.prototype.internalEntityDecl = function(name, value) {};
     Handler.prototype.startCharacterReference = function(hex, number) {};
     Handler.prototype.endDTD = function(name, publicId, systemId) {};
+    Handler.prototype.startPrefixMapping = function(prefix, uri) {};
+    Handler.prototype.endPrefixMapping = function(prefix) {};
+    Handler.prototype.processingInstruction = function(target, data) {};
+    Handler.prototype.skippedEntity = function(name) {};
+    Handler.prototype.resolveEntity = function(name, publicId, baseURI, systemId) {};
+    Handler.prototype.getExternalSubset = function(name, baseURI) {};
+    Handler.prototype.endDocument = function() {};
+    Handler.prototype.setDocumentLocator = function(locator) {};
     Handler.prototype.startEntity = function(name) {};
-    Handler.prototype.startCharacterReference = function(hex, number) {};
     Handler.prototype.startElement = function(namespaceURI, localName, qName, atts) {
         var token = "xml-name";
         //treatment is interrupted so have to update the state manually
@@ -162,7 +169,14 @@ var STATE_TRAILING_MISC             =  6;
         if (this.saxParser.saxScanner.elementsStack.length === 0) {
             this.saxParser.saxScanner.state = STATE_TRAILING_MISC;
         }
-        throw new TokenParsed(token);        
+        throw new TokenParsed(token);
+    };
+    Handler.prototype.selfClosedElement = function(namespaceURI, localName, qName) {
+        var token = "xml-name";
+        if (this.saxParser.saxScanner.elementsStack.length === 0) {
+            this.saxParser.saxScanner.state = STATE_TRAILING_MISC;
+        }
+        throw new TokenParsed(token);
     };
     Handler.prototype.characters = function(ch, start, length) {
         var token = "xml-text";
@@ -173,10 +187,10 @@ var STATE_TRAILING_MISC             =  6;
         var token = "xml-comment";
         throw new TokenParsed(token);
     };
-
     Handler.prototype.ignorableWhitespace = function(ch, start, length) {
        throw new TokenParsed(null);
     };
+
 
  function firstNext(source, state) {
         try {
@@ -221,7 +235,6 @@ function next(source, state) {
     },
 
     token: function(stream, state) {
-//e;
       if (stream.eol()) return null;
       if (!stream.column()) {
         state.startOfLine = true;
@@ -238,6 +251,9 @@ function next(source, state) {
       var contentHandler = new Handler(stream, state, state.saxParser);
       state.saxParser.setHandler(contentHandler);
       var style = state.tokenize(stream, state);
+      if (typeof style === "undefined") {
+          throw Error("style undefined");
+      }
       state.startOfLine = false;
       state.tokenize = next;
       return style;
@@ -256,18 +272,48 @@ function next(source, state) {
           val.setHandler(state[n].contentHandler);
           var readerWrapper = new SourceWrapper(null);
           val.initReaders(readerWrapper);
-          val.saxScanner.elementsStack = state[n].saxScanner.elementsStack;
-          val.saxScanner.namespaceSupport = state[n].saxScanner.namespaceSupport;
-          val.saxScanner.entities = state[n].saxScanner.entities;
-          val.saxScanner.parameterEntities = state[n].saxScanner.parameterEntities;
-          val.saxScanner.externalEntities = state[n].saxScanner.externalEntities;
-          val.saxScanner.currentEntities = state[n].saxScanner.currentEntities;
-          val.saxScanner.relativeBaseUris = state[n].saxScanner.relativeBaseUris;
-          val.saxScanner.state = state[n].saxScanner.state;
+          var clonedSaxScanner = state[n].saxScanner;
+          val.saxScanner.saxEvents = clonedSaxScanner.saxEvents;
+          val.saxScanner.saxEvents.elements = this.clone(clonedSaxScanner.saxEvents.elements);
+          if (!(clonedSaxScanner.saxEvents.context)) {
+              val.saxScanner.saxEvents.instanceContext = new Context("", []);
+          } else {
+              val.saxScanner.saxEvents.instanceContext = new Context(clonedSaxScanner.saxEvents.context.uri, this.cloneArray(clonedSaxScanner.saxEvents.context.map));
+          }
+          val.saxScanner.saxEvents.validatorFunctions = new ValidatorFunctions(val.saxScanner.saxEvents, clonedSaxScanner.saxEvents.datatypeLibrary);
+          if (clonedSaxScanner.saxEvents.childNode) {
+              val.saxScanner.saxEvents.childNode = clonedSaxScanner.saxEvents.childNode;
+              val.saxScanner.saxEvents.currentElementNode = clonedSaxScanner.saxEvents.currentElementNode;
+              //reset children of current node
+              val.saxScanner.saxEvents.currentElementNode.childNodes = [];
+          }
+
+          val.saxScanner.elementsStack = this.cloneArray(clonedSaxScanner.elementsStack);
+          val.saxScanner.namespaceSupport = this.clone(clonedSaxScanner.namespaceSupport);
+          val.saxScanner.entities = this.clone(clonedSaxScanner.entities);
+          val.saxScanner.parameterEntities = this.clone(clonedSaxScanner.parameterEntities);
+          val.saxScanner.externalEntities = this.clone(clonedSaxScanner.externalEntities);
+          val.saxScanner.relativeBaseUris = this.cloneArray(clonedSaxScanner.relativeBaseUris);
+          val.saxScanner.state = clonedSaxScanner.state;
         }
         nstate[n] = val;
       }
       return nstate;
+    },
+
+    cloneArray: function(array) {
+	var clone = [];
+        for(var i = 0; i < array.length; i++) {
+		clone[i] = array[i];
+	}
+	return clone;
+    },
+    clone: function(object) {
+	var clone = {};
+        for(var i in object) {
+		clone[i] = object[i];
+	}
+	return clone;
     },
 
     indent: function(state, textAfter) {

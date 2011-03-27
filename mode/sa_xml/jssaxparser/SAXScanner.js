@@ -96,6 +96,11 @@ var XML_DECL_BEGIN_FALSE = new RegExp("^xml("+WS_CHAR+'|\\?)', 'i');
 
 var NOT_REPLACED_ENTITIES = /^amp$|^lt$|^gt$|^quot$/;
 var APOS_ENTITY = /^apos$/;
+var CHAR_REF_ESCAPED = /^"$|^'$/;
+var charRefEscaped = {};
+charRefEscaped["'"] = "&apos;";
+charRefEscaped['"'] = "&quot;";
+
 
 
 // CUSTOM EXCEPTION CLASSES
@@ -895,30 +900,34 @@ SAXScanner.prototype.scanEntityDecl = function() {
         } else {
             entityName = this.scanName();
             this.reader.skipWhiteSpaces();
-            //if already declared, not effective
-            if (!this.entities[entityName]) {
-                externalId = new ExternalId();
-                if (this.scanExternalId(externalId)) {
-                    if (this.reader.matchStr("NDATA")) {
-                        this.reader.skipWhiteSpaces();
-                        var ndataName = this.scanName();
-                        this.saxEvents.unparsedEntityDecl(entityName, externalId.publicId, externalId.systemId, ndataName);
-                    }
+            externalId = new ExternalId();
+            if (this.scanExternalId(externalId)) {
+                this.reader.skipWhiteSpaces();
+                if (this.reader.matchStr("NDATA")) {
+                    this.reader.skipWhiteSpaces();
+                    var ndataName = this.scanName();
+                    this.saxEvents.unparsedEntityDecl(entityName, externalId.publicId, externalId.systemId, ndataName);
+                }
+                if (typeof this.externalEntities[entityName] === "undefined") {
                     this.externalEntities[entityName] = externalId;
                 } else {
-                    entityValue = this.scanEntityValue();
+                    //an XML processor MAY issue a warning if entities are declared multiple times.
+                    this.saxEvents.warning("external entity : [" + entityName + "] is declared several times, only first value : [" + this.externalEntities[entityName] + "] is effective, declaration : [" + externalId + "] is ignored");
+                }
+            } else {
+                entityValue = this.scanEntityValue();
+                if (typeof this.entities[entityName] === "undefined") {
                     if (this.isEntityReferencingItself(entityName, entityValue)) {
                         this.saxEvents.error("circular entity declaration, entity : [" + entityName + "] is referencing itself directly or indirectly", this);
                     } else {
                         this.entities[entityName] = entityValue;
                         this.saxEvents.internalEntityDecl(entityName, entityValue);
                     }
+                } else {
+                    //an XML processor MAY issue a warning if entities are declared multiple times.
+                    this.saxEvents.warning("entity : [" + entityName + "] is declared several times, only first value : [" + this.entities[entityName] + "] is effective, declaration : [" + entityValue + "] is ignored");
                 }
-            } else {
-                var ignored = this.reader.nextCharWhileNot(">");
-                //an XML processor MAY issue a warning if entities are declared multiple times.
-                this.saxEvents.warning("entity : [" + entityName + "] is declared several times, only first value : [" + this.entities[entityName] + "] is effective, declaration : [" + ignored + "] is ignored");
-            }
+            }            
         }
         this.reader.nextChar();
         return true;
@@ -958,12 +967,23 @@ SAXScanner.prototype.isEntityReferencingItself = function(entityName, entityValu
 SAXScanner.prototype.scanEntityValue = function() {
     if (this.reader.equals('"') || this.reader.equals("'")) {
         var quote = this.reader.next();
-        var entityValue = this.reader.nextCharRegExp(new RegExp("[" + quote + "%]"));
-        //if found a "%" must replace it, EntityRef are not replaced here.
-        while (this.reader.matchChar("%")) {
-            var ref = this.scanPeRef();
-            entityValue += ref;
-            entityValue += this.reader.nextCharRegExp(new RegExp("[" + quote + "%]"));
+        var regexp = new RegExp("[" + quote + "&%]");
+        var entityValue = this.reader.nextCharRegExp(regexp);
+        //if found a "%" must replace it, EntityRef are not replaced here, but char ref are replaced
+        while (true) {
+            if (this.reader.matchChar("%")) {
+                entityValue += this.scanPeRef() + this.reader.nextCharRegExp(regexp);
+            } else if (this.reader.matchChar("&")) {
+                if (this.reader.matchChar("#")) {
+                    //replacement is added to character stream
+                    this.scanCharRef();
+                    entityValue += this.reader.nextCharRegExp(regexp);
+                } else {
+                    entityValue += "&" + this.reader.nextCharRegExp(regexp);
+                }
+            } else {
+                break;
+            }
         }
         if (/\uFFFF/.test(entityValue)) {
             return this.saxEvents.fatalError("invalid entity declaration value, must not contain U+FFFF", this);
@@ -1075,14 +1095,7 @@ SAXScanner.prototype.scanAttDef = function(eName) {
         }
         if (this.reader.equals('"') || this.reader.equals("'")) {
             var quote = this.reader.next();
-            attValue = this.reader.nextCharRegExp(new RegExp("[" + quote + "<%]"));
-            //if found a "%" must replace it, PeRef are replaced here but not EntityRef
-            // Included in Literal here (not parsed as the literal can not be terminated by quote)
-            while (this.reader.matchChar("%")) {
-                var ref = this.scanPeRef();
-                attValue += ref;
-                attValue += this.reader.nextCharRegExp(new RegExp("[" + quote + "<%]"));
-            }
+            attValue = this.reader.nextCharRegExp(new RegExp("[" + quote + "<]"));
             if (this.reader.equals("<")) {
                 this.saxEvents.fatalError("invalid attribute value, must not contain &lt;", this);
             }
@@ -1175,6 +1188,7 @@ SAXScanner.prototype.scanNotationDecl = function() {
         } else {
             this.scanExternalId(externalId);
         }
+        this.reader.nextChar();
         this.saxEvents.notationDecl(name, externalId.publicId, externalId.systemId);
         return true;
     }
@@ -1235,9 +1249,16 @@ SAXScanner.prototype.scanElement = function() {
         this.saxEvents.fatalError("invalid element, must finish with &gt;", this);
     }
     this.reader.nextChar(true);
-    this.saxEvents.startElement(namespaceURI, qName.localName, qName.qName, atts);
     if (selfClosed) {
-        this.saxEvents.endElement(namespaceURI, qName.localName, qName.qName);
+        //custom event for codemirror integration
+        if (this.saxEvents.selfClosedElement) {
+            this.saxEvents.selfClosedElement(namespaceURI, qName.localName, qName.qName, atts);
+        } else {
+            this.saxEvents.startElement(namespaceURI, qName.localName, qName.qName, atts);
+            this.saxEvents.endElement(namespaceURI, qName.localName, qName.qName);
+        }
+    } else {
+        this.saxEvents.startElement(namespaceURI, qName.localName, qName.qName, atts);
     }
     return true;
 };
@@ -1413,6 +1434,9 @@ SAXScanner.prototype.scanCharRef = function() {
         this.reader.nextChar(true);
         if (this.saxParser.features['http://debeissat.nicolas.free.fr/ns/canonicalize-entities-and-character-references']) {
             replacement = String.fromCharCode(charCode);
+            if (replacement.search(CHAR_REF_ESCAPED) !== -1) {
+                replacement = charRefEscaped[replacement];
+            }
             this.includeText(replacement);
         }
         if (this.saxEvents.startCharacterReference) {
@@ -1437,7 +1461,7 @@ SAXScanner.prototype.scanEntityRef = function() {
         this.reader.nextChar(true);
         this.saxEvents.startEntity(entityName);
         this.saxEvents.endEntity(entityName);
-        // well-formed documents need not declare any of the following entities: amp, lt, gt, quot.
+        // well-formed documents does not need to declare any of the following entities: amp, lt, gt, quot.
         if (entityName.search(NOT_REPLACED_ENTITIES) !== -1) {
             throw new EntityNotReplacedException(entityName);
         }

@@ -121,6 +121,8 @@ function DatatypeLibrary() {
     this.nameStartChar = "A-Z_a-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u0200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\ud800-\udb7f\udc00-\udfff";
     this.nameChar = this.nameStartChar + "\\-\\.0-9\u00B7\u0300-\u036F\u203F-\u2040-";
     this.nameRegExp = new RegExp("^[:" + this.nameStartChar + "][:" + this.nameChar + "]*$");
+    this.nmtokenRegExp = new RegExp("^[" + this.nameChar + "]+$");
+    this.nmtokensRegExp = new RegExp("^[" + this.nameChar + "]+( [" + this.nameChar + "]*)*$");
     this.ncNameRegExp = new RegExp("^[" + this.nameStartChar + "][" + this.nameChar + "]*$");
 
     this.whitespaceChar = "\t\n\r";
@@ -309,6 +311,12 @@ DatatypeLibrary.prototype.datatypeAllows = function(datatype, paramList, string,
             case "NCName":
                 value = this.whitespace(string, this.PRESERVE, paramList);
                 return this.checkRegExpAndParams(this.ncNameRegExp, value, datatype, paramList);
+            case "NMTOKEN":
+                value = this.whitespace(string, this.PRESERVE, paramList);
+                return this.checkRegExpAndParams(this.nmtokenRegExp, value, datatype, paramList);
+            case "NMTOKENS":
+                value = this.whitespace(string, this.COLLAPSE, paramList);
+                return this.checkRegExpAndParams(this.nmtokensRegExp, value, datatype, paramList);
         /*
         
         types derived from decimal
@@ -438,6 +446,18 @@ DatatypeLibrary.prototype.datatypeEqual = function(datatype, patternString, patt
             case "NCName":
                 value = this.whitespace(string, this.PRESERVE);
                 patternValue = this.whitespace(patternString, this.PRESERVE);
+                if (value === patternValue) {
+                    return new Empty();
+                }
+                return new NotAllowed("invalid value, expected is " + patternValue, datatype, string, 10);
+            case "NMTOKEN":
+                if (string === patternString) {
+                    return new Empty();
+                }
+                return new NotAllowed("invalid value, expected is " + patternString, datatype, string, 10);
+            case "NMTOKENS":
+                value = this.whitespace(string, this.COLLAPSE);
+                patternValue = this.whitespace(patternString, this.COLLAPSE);
                 if (value === patternValue) {
                     return new Empty();
                 }

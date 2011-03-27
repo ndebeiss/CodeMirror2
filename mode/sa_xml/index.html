@@ -10,7 +10,15 @@
     <script type="text/javascript" src="jssaxparser/jsdatatypelibrary-0.2/datatype_library.js"></script>
     <script src="jssaxparser/sax.js"></script>
     <script src="sa_xml.js"></script>
-    <link rel="stylesheet" href="sa_xml.css">
+    <link rel="stylesheet" href="sa_xml.css"></link>
+    <script type="text/javascript">
+function clearError(editor) {
+    var error = document.getElementById("error");
+    if (error) {
+        error.innerHTML = "";
+    }
+}
+    </script>
   </head>
   <body>
     <h1>CodeMirror 2: schema aware XML mode</h1>
@@ -21,8 +29,11 @@
     &lt;INVALID/&gt;
 &lt;/CATALOG&gt;
 </textarea></div></form>
-    <script>
-      var editor = CodeMirror.fromTextArea(document.getElementById("code"), {mode: {name: "sa_xml"}, workTime: 100000000});
+    <script type="text/javascript">
+      var editor = CodeMirror.fromTextArea(document.getElementById("code"),
+          {mode: {name: "sa_xml"},
+           onChange: clearError,
+           workTime: 100000000});
     </script>
     <p></p>
     <div id="error"></div>

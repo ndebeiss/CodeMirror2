@@ -39,6 +39,7 @@ knowledge of the CeCILL license and that you accept its terms.
 (function () {
 
 function Serializer() {
+    this.warnSaxParseExceptions = [];
     this.saxParseExceptions = [];
     this.currentPrefixMapping = {};
     this.string = "";
@@ -50,7 +51,8 @@ function Serializer() {
 }
 
 Serializer.prototype.entify = function entify(str) { // FIX: this is probably too many replaces in some cases and a call to it may not be needed at all in some cases
-    return str.replace(/&/g, '&amp;').replace(/>/g, '&gt;').replace(new RegExp('<', 'g'), '&lt;').replace(/"/g, '&quot;');
+    //must not replace '&' of entities or character references
+    return str.replace(/&(?!(amp;|gt;|lt;|quot;|#))/g, '&amp;').replace(/>/g, '&gt;').replace(new RegExp('<', 'g'), '&lt;').replace(/"/g, '&quot;');
 };
 
 Serializer.prototype.startDocument = function() {};
@@ -84,9 +86,11 @@ Serializer.prototype.processingInstruction = function(target, data) {
 
 Serializer.prototype.ignorableWhitespace = function(ch, start, length) {
     //in output test suite of W3C, space characters inside document are &#10;
-    ch = ch.replace("\r\n", "&#10;");
-    ch = ch.replace("\n", "&#10;");
-    this.string += ch;
+    ch = ch.replace("\r\n", "\n");
+    for (var i = 0; i < ch.length; i++) {
+        this.string += "&#" + ch.charCodeAt(i) + ";";
+    }
+    //this.string += ch;
 };
 
 Serializer.prototype.characters = function(ch, start, length) {
@@ -95,8 +99,9 @@ Serializer.prototype.characters = function(ch, start, length) {
     } else {
     //in output test suite of W3C, space characters inside document are &#10;
         ch = ch.replace("\r\n", "&#10;");
-        ch = ch.replace("\n", "&#10;");
-        this.string += ch;
+        ch = ch.replace("\n", "&#9;");
+        ch = ch.replace("\r", "&#13;");
+        this.string += this.entify(ch);
     }
 };
 
@@ -167,10 +172,10 @@ Serializer.prototype.notationDecl = function (name, publicId, systemId) {
     this.dtdDumped = true;
     this.dtd += '<!NOTATION ' + name;
     if (publicId) {
-        this.dtd += ' PUBLIC ';
+        this.dtd += " PUBLIC '" + publicId + "'>\n";
     }
     if (systemId) {
-        this.dtd += "'" + systemId + "'>\n";
+        this.dtd += " SYSTEM '" + systemId + "'>\n";
     }
 };
 
@@ -178,7 +183,7 @@ Serializer.prototype.unparsedEntityDecl = function (name, publicId, systemId, no
 
 // INTERFACE: ErrorHandler: http://www.saxproject.org/apidoc/org/xml/sax/ErrorHandler.html
 Serializer.prototype.warning = function(saxParseException) {
-    this.saxParseExceptions.push(saxParseException);
+    this.warnSaxParseExceptions.push(saxParseException);
 };
 Serializer.prototype.error = function(saxParseException) {
     this.saxParseExceptions.push(saxParseException);

@@ -309,6 +309,8 @@ SAXParser.prototype.parseString = function (xmlAsString) {
 
 SAXParser.prototype.initReaders = function (readerWrapper, reader) {
     var saxEvents = new XMLFilterImpl2(this);
+    //custom event for Code
+    saxEvents.selfClosedElement = this.selfClosedElement;
     this.saxScanner = new SAXScanner(this, saxEvents);
     this.saxScanner.namespaceSupport = this.namespaceSupport;
     if (this.features['http://debeissat.nicolas.free.fr/ns/character-data-strict']) {
@@ -660,7 +662,7 @@ SAXParser.prototype.attributeDecl_augmenting = function(eName, aName, type, mode
         SAXParser.addAttributesIn(element.pattern, alreadyDeclaredAttributes);
     }
     if (SAXParser.isAlreadyDeclared(aName, alreadyDeclaredAttributes)) {
-        //this.warning("attribute : [" + aName + "] under element : [" + eName + "] is already declared", this.parent.saxScanner);
+        this.warning("attribute : [" + aName + "] under element : [" + eName + "] is already declared", this.parent.saxScanner);
     } else {
         var datatype = new Datatype("http://www.w3.org/2001/XMLSchema-datatypes", "string");
         var paramList = [];
@@ -716,7 +718,7 @@ SAXParser.prototype.augmenting_elm = function(namespaceURI, localName, qName, at
                 this.atts.setDeclared(this.index, true);
                 this.atts.setSpecified(this.index, true);
             }
-        }
+        };
         attributeNodes.push(newAtt);
     }
     var newElement = new ElementNode(new QName(namespaceURI, localName), this.instanceContext, attributeNodes, []);
@@ -743,7 +745,7 @@ SAXParser.prototype.augmenting_elm = function(namespaceURI, localName, qName, at
             atts.setSpecified(index, false);
         }
         this.attributeNodes.push(new AttributeNode(qName, value));
-    }
+    };
     //this.childNode must be an ElementNode
     if (!this.childNode) {
         this.childNode = this.currentElementNode = newElement;
@@ -771,7 +773,7 @@ SAXParser.prototype.startElement_validating = function(namespaceURI, localName, 
     if (this.context) {
         this.augmenting_elm(namespaceURI, localName, qName, atts);
         this.resultPattern = this.validatorFunctions.childDeriv(this.context, this.pattern, this.childNode);
-        if (this.resultPattern instanceof NotAllowed) {
+        if (this.resultPattern instanceof NotAllowed && !(this.resultPattern instanceof MissingContent)) {
             var str = "document not valid, message is : [" + this.resultPattern.message + "]";
             if (this.resultPattern.pattern) {
                 str += ", expected was : [" + this.resultPattern.pattern.toHTML() + "], found is : [" + this.resultPattern.childNode.toHTML() + "]";
@@ -781,6 +783,31 @@ SAXParser.prototype.startElement_validating = function(namespaceURI, localName, 
     }
     return this.parent.contentHandler.startElement.call(this.parent.contentHandler, namespaceURI, localName, qName, atts);
 }
+
+/*
+custom for CodeMirror integration
+*/
+SAXParser.prototype.selfClosedElement = function(namespaceURI, localName, qName, atts) {
+    //may not have any DTD
+    if (this.context) {
+        this.augmenting_elm(namespaceURI, localName, qName, atts);
+        this.resultPattern = this.validatorFunctions.childDeriv(this.context, this.pattern, this.childNode);
+        if (this.resultPattern instanceof NotAllowed && !(this.resultPattern instanceof MissingContent)) {
+            var str = "document not valid, message is : [" + this.resultPattern.message + "]";
+            if (this.resultPattern.pattern) {
+                str += ", expected was : [" + this.resultPattern.pattern.toHTML() + "], found is : [" + this.resultPattern.childNode.toHTML() + "]";
+            }
+            //if warning then, interrupt process
+            if (this.currentElementNode && this.currentElementNode.parentNode) {
+               this.currentElementNode = this.currentElementNode.parentNode;
+            }
+            this.warning(str);
+        }
+    }
+    this.parent.contentHandler.startElement.call(this.parent.contentHandler, namespaceURI, localName, qName, atts);
+    this.parent.contentHandler.endElement.call(this.parent.contentHandler, namespaceURI, localName, qName);
+}
+
 
 SAXParser.prototype.endElement_augmenting = function(namespaceURI, localName, qName) {
     if (this.currentElementNode && this.currentElementNode.parentNode) {
@@ -851,6 +878,7 @@ SAXParser.prototype.warning = function(message, saxScanner) {
 SAXParser.prototype.error = function(message, saxScanner) {
     var saxParseException = SAXParser.getSAXParseException(message, this.parent.contentHandler.locator, saxScanner);
     if (this.parent && this.parent.errorHandler) {
+
         this.parent.errorHandler.error.call(this.parent.errorHandler, saxParseException);
     }
 };
