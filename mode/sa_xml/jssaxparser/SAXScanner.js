@@ -655,6 +655,7 @@ SAXScanner.prototype.scanXMLDeclOrTextDecl = function() {
             return this.saxEvents.fatalError("invalid markup inside XML or text declaration; must end with &gt;", this);
         }
         this.reader.nextChar();
+        this.saxEvents.intermediateToken("xml-xmldecl");
         return true;
     } else {
         if (this.state === STATE_XML_DECL) {
@@ -679,6 +680,9 @@ SAXScanner.prototype.scanPI = function() {
         return this.saxEvents.fatalError("XML Declaration cannot occur past the very beginning of the document.", this);
     }
     var piName = this.scanName();
+    if (piName.length === 0) {
+        return this.saxEvents.fatalError("Invalid processing instruction, &lt;? must be directly followed by PITarget", this);
+    }
     this.reader.skipWhiteSpaces();
     var piData = this.reader.nextCharRegExp(new RegExp(NOT_CHAR+'|\\?'), NOT_A_CHAR_CB_OBJ);
     //if found a "?", end if it is followed by ">"
@@ -1214,6 +1218,9 @@ if called from an attribute parsing defaultPrefix would be null
 */
 SAXScanner.prototype.scanQName = function(defaultPrefix) {
     var name = this.scanName();
+    if (name.length === 0) {
+        return this.saxEvents.fatalError("qualified name is empty", this);
+    }
     var localName = name;
     if (name.indexOf(":") !== -1) {
         var splitResult = name.split(":");

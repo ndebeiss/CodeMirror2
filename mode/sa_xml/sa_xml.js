@@ -119,6 +119,9 @@ var STATE_TRAILING_MISC             =  6;
         }
         return this.errorDiv;
     };
+    Handler.prototype.intermediateToken = function(token) {
+        this.state.currentToken = token;
+    };
     Handler.prototype.startDocument = function() {
     };
     Handler.prototype.warning = function(saxParseException) {
@@ -273,28 +276,31 @@ function next(source, state) {
           var readerWrapper = new SourceWrapper(null);
           val.initReaders(readerWrapper);
           var clonedSaxScanner = state[n].saxScanner;
-          val.saxScanner.saxEvents = clonedSaxScanner.saxEvents;
-          val.saxScanner.saxEvents.elements = this.clone(clonedSaxScanner.saxEvents.elements);
-          if (!(clonedSaxScanner.saxEvents.context)) {
+          if (clonedSaxScanner) {
+              val.saxScanner.saxEvents = clonedSaxScanner.saxEvents;
+              val.saxScanner.saxEvents.elements = this.clone(clonedSaxScanner.saxEvents.elements);
+              if (!(clonedSaxScanner.saxEvents.context)) {
+                  val.saxScanner.saxEvents.instanceContext = new Context("", []);
+              } else {
+                  val.saxScanner.saxEvents.instanceContext = new Context(clonedSaxScanner.saxEvents.context.uri, this.cloneArray(clonedSaxScanner.saxEvents.context.map));
+              }
+              val.saxScanner.saxEvents.validatorFunctions = new ValidatorFunctions(val.saxScanner.saxEvents, clonedSaxScanner.saxEvents.datatypeLibrary);
+              if (clonedSaxScanner.saxEvents.childNode) {
+                  val.saxScanner.saxEvents.childNode = clonedSaxScanner.saxEvents.childNode;
+                  val.saxScanner.saxEvents.currentElementNode = clonedSaxScanner.saxEvents.currentElementNode;
+                  //reset children of current node
+                  val.saxScanner.saxEvents.currentElementNode.childNodes = [];
+              }
+              val.saxScanner.elementsStack = this.cloneArray(clonedSaxScanner.elementsStack);
+              val.saxScanner.namespaceSupport = this.clone(clonedSaxScanner.namespaceSupport);
+              val.saxScanner.entities = this.clone(clonedSaxScanner.entities);
+              val.saxScanner.parameterEntities = this.clone(clonedSaxScanner.parameterEntities);
+              val.saxScanner.externalEntities = this.clone(clonedSaxScanner.externalEntities);
+              val.saxScanner.relativeBaseUris = this.cloneArray(clonedSaxScanner.relativeBaseUris);
+              val.saxScanner.state = clonedSaxScanner.state;
+          } else if (val.saxScanner && val.saxScanner.saxEvents) {
               val.saxScanner.saxEvents.instanceContext = new Context("", []);
-          } else {
-              val.saxScanner.saxEvents.instanceContext = new Context(clonedSaxScanner.saxEvents.context.uri, this.cloneArray(clonedSaxScanner.saxEvents.context.map));
           }
-          val.saxScanner.saxEvents.validatorFunctions = new ValidatorFunctions(val.saxScanner.saxEvents, clonedSaxScanner.saxEvents.datatypeLibrary);
-          if (clonedSaxScanner.saxEvents.childNode) {
-              val.saxScanner.saxEvents.childNode = clonedSaxScanner.saxEvents.childNode;
-              val.saxScanner.saxEvents.currentElementNode = clonedSaxScanner.saxEvents.currentElementNode;
-              //reset children of current node
-              val.saxScanner.saxEvents.currentElementNode.childNodes = [];
-          }
-
-          val.saxScanner.elementsStack = this.cloneArray(clonedSaxScanner.elementsStack);
-          val.saxScanner.namespaceSupport = this.clone(clonedSaxScanner.namespaceSupport);
-          val.saxScanner.entities = this.clone(clonedSaxScanner.entities);
-          val.saxScanner.parameterEntities = this.clone(clonedSaxScanner.parameterEntities);
-          val.saxScanner.externalEntities = this.clone(clonedSaxScanner.externalEntities);
-          val.saxScanner.relativeBaseUris = this.cloneArray(clonedSaxScanner.relativeBaseUris);
-          val.saxScanner.state = clonedSaxScanner.state;
         }
         nstate[n] = val;
       }
@@ -302,11 +308,14 @@ function next(source, state) {
     },
 
     cloneArray: function(array) {
-	var clone = [];
-        for(var i = 0; i < array.length; i++) {
+        if (array) {
+	    var clone = [];
+            for(var i = 0; i < array.length; i++) {
 		clone[i] = array[i];
-	}
-	return clone;
+	    }
+            return clone;
+        }
+        return array;
     },
     clone: function(object) {
 	var clone = {};

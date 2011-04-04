@@ -309,8 +309,10 @@ SAXParser.prototype.parseString = function (xmlAsString) {
 
 SAXParser.prototype.initReaders = function (readerWrapper, reader) {
     var saxEvents = new XMLFilterImpl2(this);
-    //custom event for Code
+    //custom event for CodeMirror
     saxEvents.selfClosedElement = this.selfClosedElement;
+    //intermediate events needed for CodeMirror
+    saxEvents.intermediateToken = this.intermediateToken;
     this.saxScanner = new SAXScanner(this, saxEvents);
     this.saxScanner.namespaceSupport = this.namespaceSupport;
     if (this.features['http://debeissat.nicolas.free.fr/ns/character-data-strict']) {
@@ -352,7 +354,7 @@ SAXParser.prototype.initReaders = function (readerWrapper, reader) {
     } else {
         this.getAttributesInstance = this.getAttributes1Instance;
     }
-    if (this.contentHandler.locator) {
+    if (this.contentHandler && this.contentHandler.locator) {
         this.contentHandler.locator.reader = reader;
         this.contentHandler.locator.setSystemId(this.systemId);
         saxEvents.startDTDOld = saxEvents.startDTD;
@@ -806,6 +808,10 @@ SAXParser.prototype.selfClosedElement = function(namespaceURI, localName, qName,
     }
     this.parent.contentHandler.startElement.call(this.parent.contentHandler, namespaceURI, localName, qName, atts);
     this.parent.contentHandler.endElement.call(this.parent.contentHandler, namespaceURI, localName, qName);
+}
+
+SAXParser.prototype.intermediateToken = function(token) {
+    this.parent.contentHandler.intermediateToken.call(this.parent.contentHandler, token);
 }
 
 
