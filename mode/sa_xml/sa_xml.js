@@ -287,9 +287,13 @@ function next(source, state) {
               val.saxScanner.saxEvents.validatorFunctions = new ValidatorFunctions(val.saxScanner.saxEvents, clonedSaxScanner.saxEvents.datatypeLibrary);
               if (clonedSaxScanner.saxEvents.childNode) {
                   val.saxScanner.saxEvents.childNode = clonedSaxScanner.saxEvents.childNode;
-                  val.saxScanner.saxEvents.currentElementNode = clonedSaxScanner.saxEvents.currentElementNode;
-                  //reset children of current node
-                  val.saxScanner.saxEvents.currentElementNode.childNodes = [];
+                  if (clonedSaxScanner.elementsStack.length === 0) {
+                      val.saxScanner.saxEvents.currentElementNode = undefined;
+                  } else {
+                      val.saxScanner.saxEvents.currentElementNode = clonedSaxScanner.saxEvents.currentElementNode;
+                      //reset children of current node
+                      val.saxScanner.saxEvents.currentElementNode.childNodes = [];
+                  }
               }
               val.saxScanner.elementsStack = this.cloneArray(clonedSaxScanner.elementsStack);
               val.saxScanner.namespaceSupport = this.clone(clonedSaxScanner.namespaceSupport);

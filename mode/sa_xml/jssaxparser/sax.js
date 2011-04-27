@@ -751,6 +751,9 @@ SAXParser.prototype.augmenting_elm = function(namespaceURI, localName, qName, at
     //this.childNode must be an ElementNode
     if (!this.childNode) {
         this.childNode = this.currentElementNode = newElement;
+    //currentElementNode has been reset
+    } else if (!this.currentElementNode) {
+        this.currentElementNode = newElement;
     } else {
         this.currentElementNode.childNodes.push(newElement);
         newElement.setParentNode(this.currentElementNode);
@@ -824,7 +827,7 @@ SAXParser.prototype.endElement_augmenting = function(namespaceURI, localName, qN
 
 SAXParser.prototype.characters_augmenting = function(ch, start, length) {
     //may not have any DTD
-    if (this.context) {
+    if (this.context && this.currentElementNode) {
         var newText = new TextNode(ch);
         this.currentElementNode.childNodes.push(newText);
     }
