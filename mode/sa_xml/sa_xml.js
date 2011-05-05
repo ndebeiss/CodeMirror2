@@ -287,9 +287,7 @@ function next(source, state) {
               val.saxScanner.saxEvents.validatorFunctions = new ValidatorFunctions(val.saxScanner.saxEvents, clonedSaxScanner.saxEvents.datatypeLibrary);
               if (clonedSaxScanner.saxEvents.childNode) {
                   val.saxScanner.saxEvents.childNode = clonedSaxScanner.saxEvents.childNode;
-                  if (clonedSaxScanner.elementsStack.length === 0) {
-                      val.saxScanner.saxEvents.currentElementNode = undefined;
-                  } else {
+                  if (clonedSaxScanner.saxEvents.currentElementNode !== undefined) {
                       val.saxScanner.saxEvents.currentElementNode = clonedSaxScanner.saxEvents.currentElementNode;
                       //reset children of current node
                       val.saxScanner.saxEvents.currentElementNode.childNodes = [];
